@@ -1,0 +1,4 @@
+*.sh text eol=lf
+*.ps1 text eol=crlf
+profiles/** text eol=lf
+templates/** text eol=lf

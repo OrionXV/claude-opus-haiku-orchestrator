@@ -1,0 +1,11 @@
+Claude Opus Orchestrator + Haiku Subagents
+
+This project is derived from codex-astra-luna-orchestrator
+(https://github.com/donvito/codex-astra-luna-orchestrator), which is
+licensed under the Apache License, Version 2.0.
+
+This derivative work is modified to target Claude Code. Its profiles,
+subagent definitions, orchestrator skill, installers, and token-usage
+tooling were rewritten for Claude Code's settings, agent, and skill formats.
+
+Licensed under the Apache License, Version 2.0. See LICENSE.

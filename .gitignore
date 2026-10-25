@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+
+# Editor and local tooling files
+/.claude/settings.local.json
+.idea/
+.vscode/
+*.swp
+*.swo
