@@ -42,11 +42,10 @@ on Haiku 5.5. The reviewer runs on a separate model from the execution roles
 
 ## Setup
 
-1. Clone this repository (replace `<repository-url>` with this repository's URL
-   once it is published) and enter it:
+1. Clone this repository and enter it:
 
    ```sh
-   git clone <repository-url> claude-opus-haiku-orchestrator
+   git clone https://github.com/OrionXV/claude-opus-haiku-orchestrator.git
    cd claude-opus-haiku-orchestrator
    ```
 
