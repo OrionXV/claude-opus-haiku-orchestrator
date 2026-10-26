@@ -12,7 +12,7 @@ cat <<'BANNER'
 |            for Claude Code            |
 |                                       |
 |    Orchestrate with Opus or Fable.    |
-|          Execute with Haiku.          |
+|     Execute with Haiku or Sonnet.     |
 |                                       |
 +---------------------------------------+
 BANNER
@@ -102,9 +102,10 @@ select_profile() {
     printf '%s\n' '  4) pro-2-subagents - Sonnet 5.5 root, Haiku 5.5 subagents (2 concurrent), Opus reviewer'
     printf '%s\n' '  5) fable-xhigh-haiku-max - Fable 5.1 root (xhigh), Haiku 5.5 subagents, Fable 5.1 reviewer (max)'
     printf '%s\n' '  6) fable-medium-haiku-max - Fable 5.1 root and reviewer (medium), Haiku 5.5 subagents'
+    printf '%s\n' '  7) fable-medium-sonnet-high - Fable 5.1 root, Sonnet 5.5 subagents, Opus 5.5 researcher and reviewer'
 
     while :; do
-        printf '%s' 'Select Profile [1-6] (default 1): '
+        printf '%s' 'Select Profile [1-7] (default 1): '
         read_input || cancel_input
 
         answer=$(normalize "$input_value")
@@ -115,6 +116,7 @@ select_profile() {
             4|pro-2-subagents) profile_name=pro-2-subagents; return 0 ;;
             5|fable-xhigh-haiku-max) profile_name=fable-xhigh-haiku-max; return 0 ;;
             6|fable-medium-haiku-max) profile_name=fable-medium-haiku-max; return 0 ;;
+            7|fable-medium-sonnet-high) profile_name=fable-medium-sonnet-high; return 0 ;;
             *) printf '%s\n' 'Please enter a listed profile number or name.' ;;
         esac
     done

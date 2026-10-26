@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 
 $scriptDir = Split-Path -Parent $PSCommandPath
 $marker = '<!-- claude-orchestrator:start -->'
-$profileNames = @('max', 'pro', 'max-2-subagents', 'pro-2-subagents', 'fable-xhigh-haiku-max', 'fable-medium-haiku-max')
+$profileNames = @('max', 'pro', 'max-2-subagents', 'pro-2-subagents', 'fable-xhigh-haiku-max', 'fable-medium-haiku-max', 'fable-medium-sonnet-high')
 $bundledAgentRoles = @('explorer', 'worker', 'tester', 'reviewer', 'researcher')
 $banner = @'
 +---------------------------------------+
@@ -15,7 +15,7 @@ $banner = @'
 |            for Claude Code            |
 |                                       |
 |    Orchestrate with Opus or Fable.    |
-|          Execute with Haiku.          |
+|     Execute with Haiku or Sonnet.     |
 |                                       |
 +---------------------------------------+
 '@
@@ -65,15 +65,16 @@ function Read-Profile {
     [Console]::WriteLine('  4) pro-2-subagents - Sonnet 5.5 root, Haiku 5.5 subagents (2 concurrent), Opus reviewer')
     [Console]::WriteLine('  5) fable-xhigh-haiku-max - Fable 5.1 root (xhigh), Haiku 5.5 subagents, Fable 5.1 reviewer (max)')
     [Console]::WriteLine('  6) fable-medium-haiku-max - Fable 5.1 root and reviewer (medium), Haiku 5.5 subagents')
+    [Console]::WriteLine('  7) fable-medium-sonnet-high - Fable 5.1 root, Sonnet 5.5 subagents, Opus 5.5 researcher and reviewer')
 
     while ($true) {
-        [Console]::Write('Select Profile [1-6] (default 1): ')
+        [Console]::Write('Select Profile [1-7] (default 1): ')
         $answer = (Read-InputLine).Trim().ToLowerInvariant()
 
         if ($answer -eq '') {
             return 'max'
         }
-        if ($answer -match '^[1-6]$') {
+        if ($answer -match '^[1-7]$') {
             return $profileNames[([int]$answer) - 1]
         }
         if ($profileNames -contains $answer) {
