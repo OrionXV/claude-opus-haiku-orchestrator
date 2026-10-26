@@ -1,7 +1,8 @@
 # Claude Opus Orchestrator + Haiku Subagents
 
 Install a Claude Code profile with an Opus 5.5, Sonnet 5.5, or Fable 5.1 root
-orchestrator, Haiku 5.5 execution subagents, and an independent reviewer.
+orchestrator, Haiku 5.5 or Sonnet 5.5 execution subagents, and an independent
+reviewer.
 
 This is a Claude Code port of
 [codex-astra-luna-orchestrator](https://github.com/donvito/codex-astra-luna-orchestrator).
@@ -10,8 +11,11 @@ See [Differences from the Codex original](#differences-from-the-codex-original).
 ## Orchestration topology
 
 The root agent plans, delegates, integrates, and verifies. Execution roles run
-on Haiku 5.5. The reviewer runs on a separate model from the execution roles
-(Opus 5.5 in most profiles, Fable 5.1 in the Fable profiles).
+on Haiku 5.5 in most profiles and on Sonnet 5.5 in `fable-medium-sonnet-high`,
+where the researcher runs on Opus 5.5. The reviewer runs on a separate model
+from the explorer, worker, and tester models (Fable 5.1 in the two Fable profiles
+that use Haiku subagents, Opus 5.5 in the rest). The diagram shows the Haiku
+default.
 
 ```text
               root / orchestrator
@@ -73,7 +77,7 @@ on Haiku 5.5. The reviewer runs on a separate model from the execution roles
    at a time, so it can also be piped. It asks the following, in order:
 
    - `Target repository path: ` (must exist, and must not be this repository)
-   - `Select Profile [1-6] (default 1): ` (a number or a profile name)
+   - `Select Profile [1-7] (default 1): ` (a number or a profile name)
    - `Install <component>? [Y/n] ` for `.claude/agents`,
      `.claude/skills/claude-orchestrator`, `.claude/settings.json`, and `CLAUDE.md`
 
@@ -87,8 +91,8 @@ on Haiku 5.5. The reviewer runs on a separate model from the execution roles
    ```text
    Target repository path: ../my-project
      1) max - Opus 5.5 root, Haiku 5.5 subagents, Opus reviewer (default)
-     ...                                   (2-6 list the other profiles)
-   Select Profile [1-6] (default 1): 2
+     ...                                   (2-7 list the other profiles)
+   Select Profile [1-7] (default 1): 2
    Install .claude/agents? [Y/n]
    Install .claude/skills/claude-orchestrator? [Y/n]
    Install .claude/settings.json? [Y/n]
@@ -164,12 +168,17 @@ description. The root delegates by calling the `Agent` tool with
 | 4 | `pro-2-subagents` | `claude-sonnet-5-5` / high | `claude-haiku-5-5` / medium | `claude-opus-5-5` / low | 2 |
 | 5 | `fable-xhigh-haiku-max` | `claude-fable-5-1` / xhigh | `claude-haiku-5-5` / max | `claude-fable-5-1` / max | 4 |
 | 6 | `fable-medium-haiku-max` | `claude-fable-5-1` / medium | `claude-haiku-5-5` / max | `claude-fable-5-1` / medium | 4 |
+| 7 | `fable-medium-sonnet-high` | `claude-fable-5-1` / medium | `claude-sonnet-5-5` / high (researcher: `claude-opus-5-5` / high) | `claude-opus-5-5` / low | 4 |
 
 The `max` and `pro` names echo the Claude Max and Pro subscription plans. Each
 profile is ready to copy from `profiles/<profile>/claude/`.
 
 Each role file pins its own model and effort, so the profile's default subagent
 settings only apply to subagents without a pinned role.
+
+The fourth column lists explorer, worker, and tester first, then the researcher
+where its model or effort differs from them. In `fable-medium-sonnet-high` the
+researcher runs on Opus 5.5 while the other execution roles run on Sonnet 5.5.
 
 Guides:
 
@@ -179,6 +188,7 @@ Guides:
 - [Fast iteration](guides/fast-iteration.md) (root override)
 - [Routine coding](guides/routine-coding.md) (root override)
 - [Token usage and measurement](guides/token-usage.md)
+- [Fable root with Sonnet subagents](guides/fable-sonnet.md) (`fable-medium-sonnet-high`)
 
 ## Manual setup
 
@@ -251,7 +261,8 @@ variable Claude Code ignored, and check the trust prompt.
 │   ├── max-2-subagents/
 │   ├── pro-2-subagents/
 │   ├── fable-xhigh-haiku-max/
-│   └── fable-medium-haiku-max/
+│   ├── fable-medium-haiku-max/
+│   └── fable-medium-sonnet-high/
 ├── templates/                 # source for profiles/, edit here
 ├── guides/
 ├── scripts/
