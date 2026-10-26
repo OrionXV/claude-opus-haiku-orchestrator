@@ -22,26 +22,45 @@ CLAUDE_MD = REPO / "CLAUDE.md"
 sys.path.insert(0, str(REPO / "scripts"))
 import build_profiles  # noqa: E402
 
-ROUTINE = ("explorer", "worker", "tester", "researcher")
 ROLES = ("explorer", "worker", "tester", "reviewer", "researcher")
 HAIKU = "claude-haiku-5-5"
+SONNET = "claude-sonnet-5-5"
 OPUS = "claude-opus-5-5"
+FABLE = "claude-fable-5-1"
 ALLOWED_SETTINGS_EFFORT = {"low", "medium", "high", "xhigh"}
 
-# profile -> root model/effort, routine effort, reviewer model/effort, concurrency
+# The contract table, written out from the spec rather than read from scripts/build_profiles.py,
+# so a wrong PROFILES row fails here. Per profile: root (model, effort), the default subagent
+# model written to settings env, each role's (model, effort), and the concurrency limit.
 EXPECTED = {
-    "max": dict(root=("claude-opus-5-5", "medium"), routine=("claude-haiku-5-5", "max"),
-                reviewer=("claude-opus-5-5", "low"), concurrency="4"),
-    "pro": dict(root=("claude-sonnet-5-5", "high"), routine=("claude-haiku-5-5", "medium"),
-                reviewer=("claude-opus-5-5", "low"), concurrency="4"),
-    "max-2-subagents": dict(root=("claude-opus-5-5", "medium"), routine=("claude-haiku-5-5", "max"),
-                            reviewer=("claude-opus-5-5", "low"), concurrency="2"),
-    "pro-2-subagents": dict(root=("claude-sonnet-5-5", "high"), routine=("claude-haiku-5-5", "medium"),
-                            reviewer=("claude-opus-5-5", "low"), concurrency="2"),
-    "fable-xhigh-haiku-max": dict(root=("claude-fable-5-1", "xhigh"), routine=("claude-haiku-5-5", "max"),
-                                  reviewer=("claude-fable-5-1", "max"), concurrency="4"),
-    "fable-medium-haiku-max": dict(root=("claude-fable-5-1", "medium"), routine=("claude-haiku-5-5", "max"),
-                                   reviewer=("claude-fable-5-1", "medium"), concurrency="4"),
+    "max": dict(
+        root=(OPUS, "medium"), default_subagent=HAIKU, concurrency="4",
+        roles={"explorer": (HAIKU, "max"), "worker": (HAIKU, "max"), "tester": (HAIKU, "max"),
+               "researcher": (HAIKU, "max"), "reviewer": (OPUS, "low")}),
+    "pro": dict(
+        root=(SONNET, "high"), default_subagent=HAIKU, concurrency="4",
+        roles={"explorer": (HAIKU, "medium"), "worker": (HAIKU, "medium"), "tester": (HAIKU, "medium"),
+               "researcher": (HAIKU, "medium"), "reviewer": (OPUS, "low")}),
+    "max-2-subagents": dict(
+        root=(OPUS, "medium"), default_subagent=HAIKU, concurrency="2",
+        roles={"explorer": (HAIKU, "max"), "worker": (HAIKU, "max"), "tester": (HAIKU, "max"),
+               "researcher": (HAIKU, "max"), "reviewer": (OPUS, "low")}),
+    "pro-2-subagents": dict(
+        root=(SONNET, "high"), default_subagent=HAIKU, concurrency="2",
+        roles={"explorer": (HAIKU, "medium"), "worker": (HAIKU, "medium"), "tester": (HAIKU, "medium"),
+               "researcher": (HAIKU, "medium"), "reviewer": (OPUS, "low")}),
+    "fable-xhigh-haiku-max": dict(
+        root=(FABLE, "xhigh"), default_subagent=HAIKU, concurrency="4",
+        roles={"explorer": (HAIKU, "max"), "worker": (HAIKU, "max"), "tester": (HAIKU, "max"),
+               "researcher": (HAIKU, "max"), "reviewer": (FABLE, "max")}),
+    "fable-medium-haiku-max": dict(
+        root=(FABLE, "medium"), default_subagent=HAIKU, concurrency="4",
+        roles={"explorer": (HAIKU, "max"), "worker": (HAIKU, "max"), "tester": (HAIKU, "max"),
+               "researcher": (HAIKU, "max"), "reviewer": (FABLE, "medium")}),
+    "fable-medium-sonnet-high": dict(
+        root=(FABLE, "medium"), default_subagent=SONNET, concurrency="4",
+        roles={"explorer": (SONNET, "high"), "worker": (SONNET, "high"), "tester": (SONNET, "high"),
+               "researcher": (OPUS, "high"), "reviewer": (OPUS, "low")}),
 }
 
 # Role frontmatter tool line and color, per the contract.
@@ -128,7 +147,7 @@ class SettingsTests(unittest.TestCase):
                 self.assertEqual(settings["effortLevel"], expected["root"][1])
                 self.assertIn(settings["effortLevel"], ALLOWED_SETTINGS_EFFORT)
                 self.assertEqual(settings["env"], {
-                    "CLAUDE_CODE_SUBAGENT_MODEL": HAIKU,
+                    "CLAUDE_CODE_SUBAGENT_MODEL": expected["default_subagent"],
                     "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": expected["concurrency"],
                 })
                 self.assertEqual(text, json.dumps(settings, indent=2) + "\n")
@@ -153,25 +172,13 @@ class AgentTests(unittest.TestCase):
                     values = dict(pairs)
                     self.assertEqual(values["name"], role)
                     self.assertTrue(values["description"].strip())
-                    model, effort = expected["reviewer"] if role == "reviewer" else expected["routine"]
+                    model, effort = expected["roles"][role]
                     self.assertEqual(values["model"], model)
                     self.assertEqual(values["effort"], effort)
                     key, tools, color = ROLE_TOOLS[role]
                     self.assertEqual(values[key], tools)
                     self.assertEqual(values["color"], color)
                     self.assertTrue(body.strip())
-
-    def test_routine_roles_pin_haiku_and_reviewer_pins_root_model(self):
-        for profile, expected in EXPECTED.items():
-            for role in ROUTINE:
-                with self.subTest(profile=profile, role=role):
-                    values = dict(parse_frontmatter((profile_dir(profile) / "agents" / f"{role}.md")
-                                                    .read_text(encoding="utf-8"))[0])
-                    self.assertEqual(values["model"], HAIKU)
-            with self.subTest(profile=profile, role="reviewer"):
-                values = dict(parse_frontmatter((profile_dir(profile) / "agents" / "reviewer.md")
-                                                .read_text(encoding="utf-8"))[0])
-                self.assertEqual(values["model"], expected["reviewer"][0])
 
     def test_read_only_bodies_forbid_bash_modification(self):
         clause = "do not create, modify or delete files through any tool"
@@ -241,13 +248,12 @@ class SkillTests(unittest.TestCase):
                         found.setdefault(match.group(1), set()).add((match.group(2), match.group(3)))
                 for role in ("root",) + ROLES:
                     self.assertIn(role, found, f"no topology line for {role}")
-                    want = (expected["root"] if role == "root" else
-                            expected["reviewer"] if role == "reviewer" else expected["routine"])
+                    want = expected["root"] if role == "root" else expected["roles"][role]
                     self.assertEqual(found[role], {want}, f"topology for {role}")
 
                 self.assertIn(f"CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS={expected['concurrency']}", body)
                 self.assertIn("`Agent` tool", body)
-                self.assertIn("`claude-haiku-5-5`", body)
+                self.assertIn(f"`{expected['roles']['explorer'][0]}`", body)
                 self.assertNotIn("spawn_agent", body)
 
     def test_skill_is_full_orchestrator_not_condensed(self):
@@ -259,6 +265,41 @@ class SkillTests(unittest.TestCase):
                                 "## Escalation behavior", "## Delegated-task completion gate",
                                 "## User-facing behavior"):
                     self.assertIn(heading, text)
+
+    def test_wording_follows_each_profiles_models(self):
+        for profile, expected in EXPECTED.items():
+            with self.subTest(profile=profile):
+                text = (profile_dir(profile) / "skills" / "claude-orchestrator" / "SKILL.md").read_text(encoding="utf-8")
+                execution, researcher, reviewer = (expected["roles"][role][0]
+                                                   for role in ("explorer", "researcher", "reviewer"))
+                execution_label, researcher_label, reviewer_label = (
+                    MODEL_LABELS[model] for model in (execution, researcher, reviewer))
+                if researcher == execution:
+                    self.assertNotIn("except the researcher", text)
+                    self.assertIn(f"Use {execution_label} for all routine subagent execution.", text)
+                    self.assertIn(f"{execution_label} subagents for exploration, implementation, testing, "
+                                  "and research", text)
+                    self.assertIn(f"The root and reviewer run on the more capable models in this topology; "
+                                  f"routine execution subagents run on {execution_label}.", text)
+                else:
+                    article = "an" if researcher_label[0] in "AEIOU" else "a"
+                    self.assertIn(f"Use {execution_label} for all routine subagent execution, except the "
+                                  f"researcher, which runs on {researcher_label}.", text)
+                    self.assertIn(f"{execution_label} subagents for exploration, implementation, and testing, "
+                                  f"{researcher_label} subagents for research", text)
+                    self.assertIn(f"spawn {article} {researcher_label} researcher", text)
+                    self.assertIn("The root, reviewer, and researcher run on the more capable models", text)
+                    self.assertIn(f"routine execution subagents (explorer, worker, and tester) run on "
+                                  f"{execution_label}.", text)
+                scope = "any role other than `reviewer`"
+                if researcher == reviewer:
+                    scope += " and `researcher`"
+                self.assertIn(f"Do not spawn {reviewer_label} for {scope} unless:", text)
+                self.assertIn("Do not claim that a role agent ran on a particular model", text)
+                used = {expected["root"][0]} | {model for model, _ in expected["roles"].values()}
+                for model, label in MODEL_LABELS.items():
+                    if model not in used:
+                        self.assertNotIn(label, text)
 
 
 class CodexLeftoverTests(unittest.TestCase):

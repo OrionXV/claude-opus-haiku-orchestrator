@@ -8,14 +8,18 @@ pwsh is not on PATH.
 
 import json
 import os
+import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
+import build_profiles  # noqa: E402
 PROFILES = [
     "max",
     "pro",
@@ -23,6 +27,7 @@ PROFILES = [
     "pro-2-subagents",
     "fable-xhigh-haiku-max",
     "fable-medium-haiku-max",
+    "fable-medium-sonnet-high",
 ]
 PWSH = shutil.which("pwsh")
 PWSH_SKIP_REASON = "pwsh is not on PATH"
@@ -155,6 +160,30 @@ class InstallerTests:
                 self.assertEqual(result.returncode, 0, self.output(result))
                 self.assertIn(f"(profile: {profile}).", result.stdout)
                 self.assert_profile_installed(profile, target)
+
+    def test_each_profile_selected_by_name(self):
+        for profile in PROFILES:
+            with self.subTest(profile=profile):
+                target = self.make_dir("installer-target-")
+                result = self.run_installer(install_lines(target, profile))
+
+                self.assertEqual(result.returncode, 0, self.output(result))
+                self.assertIn(f"(profile: {profile}).", result.stdout)
+                self.assert_profile_installed(profile, target)
+
+    def test_menu_lists_every_profile_with_its_number(self):
+        result = self.run_installer(install_lines(self.target))
+
+        self.assertEqual(result.returncode, 0, self.output(result))
+        self.assertIn(f"Select Profile [1-{len(PROFILES)}] (default 1): ", result.stdout)
+        for number, profile in enumerate(PROFILES, start=1):
+            with self.subTest(profile=profile):
+                self.assertIn(f"  {number}) {profile} - ", result.stdout)
+        self.assertIn(
+            "  7) fable-medium-sonnet-high - Fable 5.1 root, Sonnet 5.5 subagents, "
+            "Opus 5.5 researcher and reviewer",
+            result.stdout,
+        )
 
     def test_profile_selected_by_name_is_case_insensitive(self):
         result = self.run_installer(install_lines(self.target, "Fable-Medium-Haiku-Max"))
@@ -648,6 +677,42 @@ class ShInstallerTests(InstallerTests, unittest.TestCase):
             self.output(result),
         )
         self.assertEqual(external_file.read_bytes(), b'{"theme": "dark"}\n')
+
+
+class InstallerScriptParityTests(unittest.TestCase):
+    """Static checks that setup.sh and setup.ps1 list the same profiles in the same order.
+
+    These run without pwsh, so the PowerShell menu is checked even where the behavioural tests skip.
+    """
+
+    def setUp(self):
+        self.slugs = [profile["slug"] for profile in build_profiles.PROFILES]
+        self.sh = (REPO_ROOT / "setup.sh").read_text(encoding="utf-8")
+        self.ps1 = (REPO_ROOT / "setup.ps1").read_text(encoding="utf-8")
+
+    @staticmethod
+    def menu(text):
+        return [(int(number), slug) for number, slug in re.findall(r"  (\d)\) ([a-z0-9-]+) - ", text)]
+
+    def test_menu_numbers_and_order_match_profiles_table(self):
+        expected = list(enumerate(self.slugs, start=1))
+        self.assertEqual(self.menu(self.sh), expected)
+        self.assertEqual(self.menu(self.ps1), expected)
+
+    def test_powershell_profile_name_array_matches_table(self):
+        match = re.search(r"\$profileNames = @\((.*)\)", self.ps1)
+        self.assertIsNotNone(match)
+        self.assertEqual(re.findall(r"'([a-z0-9-]+)'", match.group(1)), self.slugs)
+
+    def test_shell_case_arms_match_table(self):
+        arms = re.findall(r"^\s+.*\|([a-z0-9-]+)\) profile_name=", self.sh, re.MULTILINE)
+        self.assertEqual(arms, self.slugs)
+
+    def test_prompt_range_matches_profile_count(self):
+        expected = f"[1-{len(self.slugs)}]"
+        self.assertIn(f"Select Profile {expected} (default 1): ", self.sh)
+        self.assertIn(f"Select Profile {expected} (default 1): ", self.ps1)
+        self.assertIn(f"'^[1-{len(self.slugs)}]$'", self.ps1)
 
 
 @unittest.skipUnless(PWSH, PWSH_SKIP_REASON)
