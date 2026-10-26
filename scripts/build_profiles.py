@@ -12,6 +12,7 @@ import argparse
 import json
 import re
 import sys
+from collections import namedtuple
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -19,9 +20,14 @@ TEMPLATES = ROOT / "templates"
 PROFILES_DIR = ROOT / "profiles"
 
 ROLES = ("explorer", "worker", "tester", "reviewer", "researcher")
-ROUTINE_ROLES = ("explorer", "worker", "tester", "researcher")
+# The prose in SKILL.md names one execution model, so these roles must share a model.
+EXECUTION_ROLES = ("explorer", "worker", "tester")
 
 SETTINGS_SCHEMA = "https://json.schemastore.org/claude-code-settings.json"
+
+# settings.json effortLevel accepts these; agent frontmatter effort also accepts "max".
+ROOT_EFFORTS = ("low", "medium", "high", "xhigh")
+ROLE_EFFORTS = ROOT_EFFORTS + ("max",)
 
 MODEL_LABELS = {
     "claude-opus-5-5": "Opus 5.5",
@@ -30,78 +36,115 @@ MODEL_LABELS = {
     "claude-fable-5-1": "Fable 5.1",
 }
 
+Setting = namedtuple("Setting", ("model", "effort"))
+
 # Order is the installer menu order (choice number = position + 1).
+# Every role has its own model and effort. default_subagent_model is written to the
+# settings env as CLAUDE_CODE_SUBAGENT_MODEL for subagents without a pinned role.
 PROFILES = [
     {
         "slug": "max",
         "label": "Max",
         "name": "Max profile",
-        "root_model": "claude-opus-5-5",
-        "root_effort": "medium",
-        "subagent_model": "claude-haiku-5-5",
-        "subagent_effort": "max",
-        "reviewer_model": "claude-opus-5-5",
-        "reviewer_effort": "low",
+        "root": Setting("claude-opus-5-5", "medium"),
+        "default_subagent_model": "claude-haiku-5-5",
+        "roles": {
+            "explorer": Setting("claude-haiku-5-5", "max"),
+            "worker": Setting("claude-haiku-5-5", "max"),
+            "tester": Setting("claude-haiku-5-5", "max"),
+            "researcher": Setting("claude-haiku-5-5", "max"),
+            "reviewer": Setting("claude-opus-5-5", "low"),
+        },
         "concurrency": 4,
     },
     {
         "slug": "pro",
         "label": "Pro",
         "name": "Pro profile",
-        "root_model": "claude-sonnet-5-5",
-        "root_effort": "high",
-        "subagent_model": "claude-haiku-5-5",
-        "subagent_effort": "medium",
-        "reviewer_model": "claude-opus-5-5",
-        "reviewer_effort": "low",
+        "root": Setting("claude-sonnet-5-5", "high"),
+        "default_subagent_model": "claude-haiku-5-5",
+        "roles": {
+            "explorer": Setting("claude-haiku-5-5", "medium"),
+            "worker": Setting("claude-haiku-5-5", "medium"),
+            "tester": Setting("claude-haiku-5-5", "medium"),
+            "researcher": Setting("claude-haiku-5-5", "medium"),
+            "reviewer": Setting("claude-opus-5-5", "low"),
+        },
         "concurrency": 4,
     },
     {
         "slug": "max-2-subagents",
         "label": "Max 2-subagents",
         "name": "Max 2-subagents profile",
-        "root_model": "claude-opus-5-5",
-        "root_effort": "medium",
-        "subagent_model": "claude-haiku-5-5",
-        "subagent_effort": "max",
-        "reviewer_model": "claude-opus-5-5",
-        "reviewer_effort": "low",
+        "root": Setting("claude-opus-5-5", "medium"),
+        "default_subagent_model": "claude-haiku-5-5",
+        "roles": {
+            "explorer": Setting("claude-haiku-5-5", "max"),
+            "worker": Setting("claude-haiku-5-5", "max"),
+            "tester": Setting("claude-haiku-5-5", "max"),
+            "researcher": Setting("claude-haiku-5-5", "max"),
+            "reviewer": Setting("claude-opus-5-5", "low"),
+        },
         "concurrency": 2,
     },
     {
         "slug": "pro-2-subagents",
         "label": "Pro 2-subagents",
         "name": "Pro 2-subagents profile",
-        "root_model": "claude-sonnet-5-5",
-        "root_effort": "high",
-        "subagent_model": "claude-haiku-5-5",
-        "subagent_effort": "medium",
-        "reviewer_model": "claude-opus-5-5",
-        "reviewer_effort": "low",
+        "root": Setting("claude-sonnet-5-5", "high"),
+        "default_subagent_model": "claude-haiku-5-5",
+        "roles": {
+            "explorer": Setting("claude-haiku-5-5", "medium"),
+            "worker": Setting("claude-haiku-5-5", "medium"),
+            "tester": Setting("claude-haiku-5-5", "medium"),
+            "researcher": Setting("claude-haiku-5-5", "medium"),
+            "reviewer": Setting("claude-opus-5-5", "low"),
+        },
         "concurrency": 2,
     },
     {
         "slug": "fable-xhigh-haiku-max",
         "label": "Fable xhigh",
         "name": "Fable xhigh root profile",
-        "root_model": "claude-fable-5-1",
-        "root_effort": "xhigh",
-        "subagent_model": "claude-haiku-5-5",
-        "subagent_effort": "max",
-        "reviewer_model": "claude-fable-5-1",
-        "reviewer_effort": "max",
+        "root": Setting("claude-fable-5-1", "xhigh"),
+        "default_subagent_model": "claude-haiku-5-5",
+        "roles": {
+            "explorer": Setting("claude-haiku-5-5", "max"),
+            "worker": Setting("claude-haiku-5-5", "max"),
+            "tester": Setting("claude-haiku-5-5", "max"),
+            "researcher": Setting("claude-haiku-5-5", "max"),
+            "reviewer": Setting("claude-fable-5-1", "max"),
+        },
         "concurrency": 4,
     },
     {
         "slug": "fable-medium-haiku-max",
         "label": "Fable medium",
         "name": "Fable medium root profile",
-        "root_model": "claude-fable-5-1",
-        "root_effort": "medium",
-        "subagent_model": "claude-haiku-5-5",
-        "subagent_effort": "max",
-        "reviewer_model": "claude-fable-5-1",
-        "reviewer_effort": "medium",
+        "root": Setting("claude-fable-5-1", "medium"),
+        "default_subagent_model": "claude-haiku-5-5",
+        "roles": {
+            "explorer": Setting("claude-haiku-5-5", "max"),
+            "worker": Setting("claude-haiku-5-5", "max"),
+            "tester": Setting("claude-haiku-5-5", "max"),
+            "researcher": Setting("claude-haiku-5-5", "max"),
+            "reviewer": Setting("claude-fable-5-1", "medium"),
+        },
+        "concurrency": 4,
+    },
+    {
+        "slug": "fable-medium-sonnet-high",
+        "label": "Fable medium Sonnet",
+        "name": "Fable medium root, Sonnet subagents profile",
+        "root": Setting("claude-fable-5-1", "medium"),
+        "default_subagent_model": "claude-sonnet-5-5",
+        "roles": {
+            "explorer": Setting("claude-sonnet-5-5", "high"),
+            "worker": Setting("claude-sonnet-5-5", "high"),
+            "tester": Setting("claude-sonnet-5-5", "high"),
+            "researcher": Setting("claude-opus-5-5", "high"),
+            "reviewer": Setting("claude-opus-5-5", "low"),
+        },
         "concurrency": 4,
     },
 ]
@@ -127,31 +170,88 @@ def render(text, context, source):
     return rendered.rstrip("\n") + "\n"
 
 
+def validate_profile(profile):
+    slug = profile["slug"]
+    if set(profile["roles"]) != set(ROLES):
+        raise SystemExit(f"{slug}: roles must be exactly {', '.join(ROLES)}")
+    if profile["root"].model not in MODEL_LABELS or profile["root"].effort not in ROOT_EFFORTS:
+        raise SystemExit(f"{slug}: invalid root setting {tuple(profile['root'])}")
+    for role in ROLES:
+        setting = profile["roles"][role]
+        if setting.model not in MODEL_LABELS or setting.effort not in ROLE_EFFORTS:
+            raise SystemExit(f"{slug}: invalid {role} setting {tuple(setting)}")
+    if profile["default_subagent_model"] not in MODEL_LABELS:
+        raise SystemExit(f"{slug}: unknown default_subagent_model")
+    if len({profile["roles"][role].model for role in EXECUTION_ROLES}) != 1:
+        raise SystemExit(f"{slug}: {', '.join(EXECUTION_ROLES)} must share one model")
+    if profile["roles"]["reviewer"].model == profile["roles"]["explorer"].model:
+        raise SystemExit(f"{slug}: reviewer must run on a model other than the execution roles")
+
+
+def join_names(names):
+    quoted = [f"`{name}`" for name in names]
+    if len(quoted) <= 2:
+        return " and ".join(quoted)
+    return ", ".join(quoted[:-1]) + ", and " + quoted[-1]
+
+
 def profile_context(profile):
+    roles = profile["roles"]
+    execution_model = roles["explorer"].model
+    execution_label = MODEL_LABELS[execution_model]
+    researcher_model = roles["researcher"].model
+    researcher_label = MODEL_LABELS[researcher_model]
+    reviewer_model = roles["reviewer"].model
+
+    # The researcher exception is stated only when its model differs from the execution roles.
+    if researcher_model == execution_model:
+        researcher_exception = ""
+        capable_roles = "root and reviewer"
+        routine_clause = f"routine execution subagents run on {execution_label}"
+        subagent_summary = f"{execution_label} subagents for exploration, implementation, testing, and research"
+    else:
+        researcher_exception = f", except the researcher, which runs on {researcher_label}"
+        capable_roles = "root, reviewer, and researcher"
+        routine_clause = f"routine execution subagents (explorer, worker, and tester) run on {execution_label}"
+        subagent_summary = (
+            f"{execution_label} subagents for exploration, implementation, and testing, "
+            f"{researcher_label} subagents for research"
+        )
+
+    # Non-reviewer roles on the reviewer's model are named next to the reviewer in the spawn policy.
+    shared = [role for role in ROLES if role != "reviewer" and roles[role].model == reviewer_model]
+    reviewer_scope = "any role other than " + join_names(["reviewer"] + shared)
+
     context = {
         "profile_name": profile["name"],
         "profile_label": profile["label"],
-        "root_model": profile["root_model"],
-        "root_label": MODEL_LABELS[profile["root_model"]],
-        "root_effort": profile["root_effort"],
-        "subagent_model": profile["subagent_model"],
-        "subagent_label": MODEL_LABELS[profile["subagent_model"]],
-        "subagent_effort": profile["subagent_effort"],
-        "reviewer_model": profile["reviewer_model"],
-        "reviewer_label": MODEL_LABELS[profile["reviewer_model"]],
-        "reviewer_effort": profile["reviewer_effort"],
+        "root_model": profile["root"].model,
+        "root_label": MODEL_LABELS[profile["root"].model],
+        "root_effort": profile["root"].effort,
+        "execution_label": execution_label,
+        "subagent_summary": subagent_summary,
+        "researcher_article": "an" if researcher_label[0] in "AEIOU" else "a",
+        "researcher_exception": researcher_exception,
+        "capable_roles": capable_roles,
+        "routine_clause": routine_clause,
+        "reviewer_scope": reviewer_scope,
         "concurrency": str(profile["concurrency"]),
     }
+    for role in ROLES:
+        setting = roles[role]
+        context[f"{role}_model"] = setting.model
+        context[f"{role}_effort"] = setting.effort
+        context[f"{role}_label"] = MODEL_LABELS[setting.model]
     return context
 
 
 def settings_text(profile):
     settings = {
         "$schema": SETTINGS_SCHEMA,
-        "model": profile["root_model"],
-        "effortLevel": profile["root_effort"],
+        "model": profile["root"].model,
+        "effortLevel": profile["root"].effort,
         "env": {
-            "CLAUDE_CODE_SUBAGENT_MODEL": profile["subagent_model"],
+            "CLAUDE_CODE_SUBAGENT_MODEL": profile["default_subagent_model"],
             "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": str(profile["concurrency"]),
         },
     }
@@ -160,15 +260,13 @@ def settings_text(profile):
 
 def build_outputs(profile):
     """Return {relative path under profiles/<slug>/claude/: text}."""
+    validate_profile(profile)
     context = profile_context(profile)
     outputs = {"settings.json": settings_text(profile)}
 
     for role in ROLES:
-        if role == "reviewer":
-            model, effort = profile["reviewer_model"], profile["reviewer_effort"]
-        else:
-            model, effort = profile["subagent_model"], profile["subagent_effort"]
-        role_context = dict(context, model=model, effort=effort)
+        setting = profile["roles"][role]
+        role_context = dict(context, model=setting.model, effort=setting.effort)
         source = f"templates/agents/{role}.md.tmpl"
         outputs[f"agents/{role}.md"] = render(read_template(f"agents/{role}.md.tmpl"), role_context, source)
 

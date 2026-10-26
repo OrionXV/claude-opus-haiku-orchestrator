@@ -433,4 +433,4 @@ If the user explicitly asks to see delegation, report:
 - assigned task
 - completion status
 
-Do not claim a Haiku 5.5 agent was used unless a successful `Agent` call used `subagent_type` set to `explorer`, `worker`, `tester`, or `researcher` without a `model` argument, since those role files pin `claude-haiku-5-5`. The root cannot read subagent transcripts in-session. To confirm the model, the user can run `/tasks`.
+Do not claim that a role agent ran on a particular model unless a successful `Agent` call used `subagent_type` set to `explorer`, `worker`, `tester`, `reviewer`, or `researcher` without a `model` argument, since each role file pins its own model. The root cannot read subagent transcripts in-session. To confirm the model, the user can run `/tasks`.

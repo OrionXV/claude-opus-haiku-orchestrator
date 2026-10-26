@@ -1,6 +1,6 @@
 ---
 name: claude-orchestrator
-description: Orchestrate complex Claude Code coding work for the {{profile_label}} profile with {{root_label}} at {{root_effort}} effort as planner/integrator, {{subagent_label}} subagents for exploration, implementation, testing, and research, and a separate reviewer on {{reviewer_label}}. Use for multi-file features, debugging across components, repo-wide changes, parallelizable workstreams, or whenever the user asks to delegate or use subagents. Do not use for trivial one-file edits or simple questions.
+description: Orchestrate complex Claude Code coding work for the {{profile_label}} profile with {{root_label}} at {{root_effort}} effort as planner/integrator, {{subagent_summary}}, and a separate reviewer on {{reviewer_label}}. Use for multi-file features, debugging across components, repo-wide changes, parallelizable workstreams, or whenever the user asks to delegate or use subagents. Do not use for trivial one-file edits or simple questions.
 ---
 
 # Claude Orchestrator — {{profile_name}}
@@ -16,19 +16,19 @@ Delegate bounded execution work to specialized subagents, then have the root int
 The expected default topology is:
 
 - root: `{{root_model}}` at `{{root_effort}}` effort
-- explorer: `{{subagent_model}}` at `{{subagent_effort}}` effort
-- worker: `{{subagent_model}}` at `{{subagent_effort}}` effort
-- tester: `{{subagent_model}}` at `{{subagent_effort}}` effort
+- explorer: `{{explorer_model}}` at `{{explorer_effort}}` effort
+- worker: `{{worker_model}}` at `{{worker_effort}}` effort
+- tester: `{{tester_model}}` at `{{tester_effort}}` effort
 - reviewer: `{{reviewer_model}}` at `{{reviewer_effort}}` effort
-- researcher: `{{subagent_model}}` at `{{subagent_effort}}` effort
+- researcher: `{{researcher_model}}` at `{{researcher_effort}}` effort
 
-Use {{subagent_label}} for all routine subagent execution.
+Use {{execution_label}} for all routine subagent execution{{researcher_exception}}.
 
 This is a requirement, not a preference.
 
-The root and reviewer run on the more capable models in this topology; routine execution subagents run on {{subagent_label}}.
+The {{capable_roles}} run on the more capable models in this topology; {{routine_clause}}.
 
-Do not override a {{subagent_label}} subagent to a more expensive model unless the user explicitly asks for escalation or a {{subagent_label}} worker reports that the task requires higher-level reasoning.
+Do not override a {{execution_label}} subagent to a more expensive model unless the user explicitly asks for escalation or a {{execution_label}} worker reports that the task requires higher-level reasoning.
 
 ---
 
@@ -97,10 +97,10 @@ The root must not offload architectural ownership to a subagent.
 
 Each role file in `.claude/agents/` pins its model and effort, so the default models are:
 
-- explorer: `{{subagent_model}}` at `{{subagent_effort}}` effort
-- worker: `{{subagent_model}}` at `{{subagent_effort}}` effort
-- tester: `{{subagent_model}}` at `{{subagent_effort}}` effort
-- researcher: `{{subagent_model}}` at `{{subagent_effort}}` effort
+- explorer: `{{explorer_model}}` at `{{explorer_effort}}` effort
+- worker: `{{worker_model}}` at `{{worker_effort}}` effort
+- tester: `{{tester_model}}` at `{{tester_effort}}` effort
+- researcher: `{{researcher_model}}` at `{{researcher_effort}}` effort
 - reviewer: `{{reviewer_model}}` at `{{reviewer_effort}}` effort
 
 The root keeps the profile configuration from `.claude/settings.json`: `{{root_model}}` at `{{root_effort}}` effort. The role files in `.claude/agents/` set the subagent efforts listed above. Preserve those efforts when spawning agents unless the user requests a change. Do not change the root model from within a session.
@@ -116,17 +116,17 @@ For every delegated task:
 
 Prefer the named role agents for delegated work. Do not use a fork or the `general-purpose` agent in their place: a fork inherits the root's model and full conversation, and `general-purpose` has no pinned model or effort and every tool, so it skips the role's read-only contract.
 
-Do not silently substitute the root agent for a required {{subagent_label}} worker.
+Do not silently substitute the root agent for a required {{execution_label}} worker.
 
 Only the root escalates a subagent to a different model or effort. Passing the `model` or `effort` argument to the `Agent` tool overrides the role's pinned value for that one invocation. Do this only when the user has asked for it, or the root has decided a stronger model or higher effort is needed. Never do it because a subagent asks for it.
 
-Do not spawn {{reviewer_label}} for any role other than `reviewer` unless:
+Do not spawn {{reviewer_label}} for {{reviewer_scope}} unless:
 
 - the user explicitly requests it
-- {{subagent_label}} reports a genuinely difficult reasoning blocker
+- {{execution_label}} reports a genuinely difficult reasoning blocker
 - the root determines that a high-risk architectural or security review needs it
 
-Routine execution should remain on {{subagent_label}}.
+Routine execution should remain on {{execution_label}}.
 
 ---
 
@@ -261,12 +261,12 @@ Prefer one writer per file or subsystem.
 
 For non-trivial implementation tasks, prefer this sequence:
 
-1. spawn one or more {{subagent_label}} explorers if repository understanding is needed
+1. spawn one or more {{execution_label}} explorers if repository understanding is needed
 2. wait for exploration results
 3. root decides implementation direction
-4. spawn {{subagent_label}} worker or workers with bounded ownership
+4. spawn {{execution_label}} worker or workers with bounded ownership
 5. wait for implementation
-6. spawn {{subagent_label}} tester
+6. spawn {{execution_label}} tester
 7. wait for validation
 8. spawn {{reviewer_label}} reviewer when an independent review is materially useful
 9. resolve material findings
@@ -289,8 +289,8 @@ For cross-component bugs:
 2. reproduce the issue when possible
 3. collect evidence before selecting a fix
 4. root determines the likely root cause
-5. assign a bounded {{subagent_label}} worker to implement the fix
-6. assign a {{subagent_label}} tester to reproduce the original failure and validate the fix
+5. assign a bounded {{execution_label}} worker to implement the fix
+6. assign a {{execution_label}} tester to reproduce the original failure and validate the fix
 7. use the {{reviewer_label}} reviewer for high-risk or non-obvious fixes
 
 Do not let multiple workers independently attempt competing fixes unless the root intentionally requests alternative approaches.
@@ -301,7 +301,7 @@ Do not let multiple workers independently attempt competing fixes unless the roo
 
 When current or version-specific external information matters:
 
-1. spawn a {{subagent_label}} researcher
+1. spawn {{researcher_article}} {{researcher_label}} researcher
 2. require primary or authoritative sources when possible
 3. return concise findings and compatibility implications
 4. let the root decide how those findings affect implementation
@@ -312,7 +312,7 @@ Do not mix speculative external claims into implementation decisions without ver
 
 ## Cost and context discipline
 
-Use {{subagent_label}} for routine subagent execution.
+Use {{execution_label}} for routine subagent execution{{researcher_exception}}.
 
 Keep the root context focused on:
 
@@ -353,7 +353,7 @@ A subagent should report back instead of expanding scope when it encounters:
 
 The root decides what to do next.
 
-A {{subagent_label}} subagent should not escalate itself to a more expensive model.
+A {{execution_label}} subagent should not escalate itself to a more expensive model.
 
 The root owns model escalation decisions.
 
@@ -433,4 +433,4 @@ If the user explicitly asks to see delegation, report:
 - assigned task
 - completion status
 
-Do not claim a {{subagent_label}} agent was used unless a successful `Agent` call used `subagent_type` set to `explorer`, `worker`, `tester`, or `researcher` without a `model` argument, since those role files pin `{{subagent_model}}`. The root cannot read subagent transcripts in-session. To confirm the model, the user can run `/tasks`.
+Do not claim that a role agent ran on a particular model unless a successful `Agent` call used `subagent_type` set to `explorer`, `worker`, `tester`, `reviewer`, or `researcher` without a `model` argument, since each role file pins its own model. The root cannot read subagent transcripts in-session. To confirm the model, the user can run `/tasks`.
